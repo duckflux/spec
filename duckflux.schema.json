@@ -1,0 +1,422 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://duckflux.dev/schema/v0.1/duckflux.schema.json",
+  "title": "duckflux Workflow",
+  "description": "Schema for duckflux — a minimal, deterministic, runtime-agnostic workflow DSL.",
+  "type": "object",
+  "required": ["participants", "flow"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Human-readable workflow name."
+    },
+    "version": {
+      "description": "Version identifier for the workflow definition.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "integer" }
+      ]
+    },
+    "defaults": {
+      "$ref": "#/$defs/defaults"
+    },
+    "inputs": {
+      "$ref": "#/$defs/inputs"
+    },
+    "participants": {
+      "type": "object",
+      "description": "Named steps that can be referenced in the flow.",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/participant"
+      },
+      "not": {
+        "anyOf": [
+          { "required": ["workflow"] },
+          { "required": ["execution"] },
+          { "required": ["input"] },
+          { "required": ["output"] },
+          { "required": ["env"] },
+          { "required": ["loop"] }
+        ]
+      }
+    },
+    "flow": {
+      "$ref": "#/$defs/flowSequence"
+    },
+    "output": {
+      "$ref": "#/$defs/workflowOutput"
+    }
+  },
+
+  "$defs": {
+
+    "duration": {
+      "type": "string",
+      "pattern": "^[0-9]+(ms|s|m|h)$",
+      "description": "Duration string, e.g. '30s', '5m', '2h'."
+    },
+
+    "celExpression": {
+      "type": "string",
+      "description": "A Google CEL expression."
+    },
+
+    "defaults": {
+      "type": "object",
+      "description": "Global defaults applied to all participants.",
+      "additionalProperties": false,
+      "properties": {
+        "timeout": {
+          "$ref": "#/$defs/duration"
+        }
+      }
+    },
+
+    "inputs": {
+      "type": "object",
+      "description": "Workflow input parameters. Each key is a parameter name. Value can be null (string, no schema), or a JSON Schema object for validation.",
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "null" },
+          { "$ref": "#/$defs/inputField" }
+        ]
+      }
+    },
+
+    "inputField": {
+      "type": "object",
+      "description": "JSON Schema field definition with optional 'required: true' shortcut.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["string", "integer", "number", "boolean", "array", "object"]
+        },
+        "description": { "type": "string" },
+        "default": {},
+        "required": { "type": "boolean" },
+        "format": { "type": "string" },
+        "enum": { "type": "array" },
+        "minimum": { "type": "number" },
+        "maximum": { "type": "number" },
+        "minLength": { "type": "integer" },
+        "maxLength": { "type": "integer" },
+        "pattern": { "type": "string" },
+        "items": {
+          "$ref": "#/$defs/inputField"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "retryConfig": {
+      "type": "object",
+      "description": "Retry configuration. Only applies when onError is 'retry'.",
+      "additionalProperties": false,
+      "required": ["max"],
+      "properties": {
+        "max": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of retry attempts."
+        },
+        "backoff": {
+          "$ref": "#/$defs/duration",
+          "description": "Interval between attempts. Default: 0s."
+        },
+        "factor": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Backoff multiplier. Default: 1 (no escalation)."
+        }
+      }
+    },
+
+    "onError": {
+      "type": "string",
+      "description": "Error handling strategy: 'fail' (default), 'skip', 'retry', or a participant name for redirect.",
+      "minLength": 1
+    },
+
+    "participantInput": {
+      "description": "Input mapping. String for direct passthrough, object for structured mapping. Values are CEL expressions.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+
+    "participantOutputSchema": {
+      "type": "object",
+      "description": "Output schema (JSON Schema fields). Opt-in validation.",
+      "additionalProperties": {
+        "$ref": "#/$defs/inputField"
+      }
+    },
+
+    "participant": {
+      "type": "object",
+      "required": ["type"],
+      "description": "A named, reusable building block of the workflow.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["agent", "exec", "http", "human", "mcp", "workflow", "hook"],
+          "description": "Participant type."
+        },
+        "as": {
+          "type": "string",
+          "description": "Human-readable display name."
+        },
+        "timeout": {
+          "$ref": "#/$defs/duration"
+        },
+        "onError": {
+          "$ref": "#/$defs/onError"
+        },
+        "retry": {
+          "$ref": "#/$defs/retryConfig"
+        },
+        "input": {
+          "$ref": "#/$defs/participantInput"
+        },
+        "output": {
+          "$ref": "#/$defs/participantOutputSchema"
+        },
+
+        "model": {
+          "type": "string",
+          "description": "[agent] Language model identifier."
+        },
+        "tools": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "[agent] Tools available to the agent."
+        },
+
+        "run": {
+          "type": "string",
+          "description": "[exec] Shell command to execute."
+        },
+
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "[http] Target URL."
+        },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+          "description": "[http] HTTP method."
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "[http] HTTP headers."
+        },
+        "body": {
+          "description": "[http] Request body. String or object.",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object" }
+          ]
+        },
+
+        "path": {
+          "type": "string",
+          "description": "[workflow] Path to the sub-workflow YAML file."
+        },
+
+        "server": {
+          "type": "string",
+          "description": "[mcp] MCP server identifier."
+        },
+        "tool": {
+          "type": "string",
+          "description": "[mcp] MCP tool name to invoke."
+        },
+
+        "prompt": {
+          "type": "string",
+          "description": "[human] Prompt or instructions for the human operator."
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "flowSequence": {
+      "type": "array",
+      "description": "Ordered list of flow steps.",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/flowStep"
+      }
+    },
+
+    "flowStep": {
+      "description": "A single step in the flow: participant reference (string), or a control construct / participant override (object).",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Simple participant reference by name."
+        },
+        {
+          "$ref": "#/$defs/flowStepObject"
+        }
+      ]
+    },
+
+    "flowStepObject": {
+      "type": "object",
+      "description": "A flow step object: either a control construct (loop, parallel, if) or a participant with overrides.",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "oneOf": [
+        { "$ref": "#/$defs/loopStep" },
+        { "$ref": "#/$defs/parallelStep" },
+        { "$ref": "#/$defs/ifStep" },
+        { "$ref": "#/$defs/participantOverrideStep" }
+      ]
+    },
+
+    "loopStep": {
+      "type": "object",
+      "required": ["loop"],
+      "additionalProperties": false,
+      "properties": {
+        "loop": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["steps"],
+          "properties": {
+            "until": {
+              "$ref": "#/$defs/celExpression",
+              "description": "CEL condition to break out of the loop."
+            },
+            "max": {
+              "description": "Maximum iterations. Integer or CEL expression.",
+              "oneOf": [
+                { "type": "integer", "minimum": 1 },
+                { "type": "string" }
+              ]
+            },
+            "steps": {
+              "$ref": "#/$defs/flowSequence"
+            }
+          },
+          "anyOf": [
+            { "required": ["until"] },
+            { "required": ["max"] }
+          ]
+        }
+      }
+    },
+
+    "parallelStep": {
+      "type": "object",
+      "required": ["parallel"],
+      "additionalProperties": false,
+      "properties": {
+        "parallel": {
+          "$ref": "#/$defs/flowSequence",
+          "description": "Steps to run concurrently."
+        }
+      }
+    },
+
+    "ifStep": {
+      "type": "object",
+      "required": ["if"],
+      "additionalProperties": false,
+      "properties": {
+        "if": {
+          "type": "object",
+          "required": ["condition", "then"],
+          "additionalProperties": false,
+          "properties": {
+            "condition": {
+              "$ref": "#/$defs/celExpression",
+              "description": "CEL expression that determines which branch to take."
+            },
+            "then": {
+              "$ref": "#/$defs/flowSequence"
+            },
+            "else": {
+              "$ref": "#/$defs/flowSequence"
+            }
+          }
+        }
+      }
+    },
+
+    "participantOverrideStep": {
+      "type": "object",
+      "description": "A participant reference with flow-level overrides (timeout, onError, when, input, workflow, etc.).",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "when": {
+            "$ref": "#/$defs/celExpression",
+            "description": "Guard condition. If false, step is skipped."
+          },
+          "timeout": {
+            "$ref": "#/$defs/duration"
+          },
+          "onError": {
+            "$ref": "#/$defs/onError"
+          },
+          "retry": {
+            "$ref": "#/$defs/retryConfig"
+          },
+          "input": {
+            "$ref": "#/$defs/participantInput"
+          },
+          "workflow": {
+            "type": "string",
+            "description": "Inline sub-workflow path (alternative to defining as participant)."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "workflowOutput": {
+      "description": "Workflow output. String (single CEL expression), object (structured mapping), or object with schema+map.",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Single CEL expression mapping."
+        },
+        {
+          "type": "object",
+          "description": "Structured output mapping (key → CEL expression) or schema+map.",
+          "properties": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/inputField"
+              }
+            },
+            "map": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      ]
+    }
+  }
+}
