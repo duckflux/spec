@@ -1036,8 +1036,11 @@ Variables available in any CEL expression within the workflow. Accessed as direc
 | `execution.startedAt` | timestamp | When the execution started |
 | `execution.status` | string | Current status: `running`, `success`, `failure` |
 | `execution.context` | map | Shared data between steps (read/write scratchpad) |
+| `execution.cwd` | string | Base working directory resolved at startup |
 
 `execution.context` is a read/write map that any step can use to share data across the workflow. It functions as a global scratchpad for the execution — any step can read from and write to it.
+
+`execution.cwd` is the base working directory for the execution, resolved from the precedence chain: `--cwd` (CLI flag) > `defaults.cwd` > process cwd. Individual participants may override this with their own `cwd` field.
 
 ### 12.3 `input` — Workflow Input Parameters
 
@@ -1081,6 +1084,7 @@ Each registered participant is accessible directly by its name (no `steps.` pref
 | `<step>.duration` | duration | Execution time |
 | `<step>.retries` | int | How many times the step executed |
 | `<step>.error` | string | Error message (when `status == "failure"`) |
+| `<step>.cwd` | string | Effective working directory used (only for `exec` participants) |
 
 This design choice — direct access by name instead of a `steps.` prefix — was made for DX reasons. `reviewer.output.approved` is more natural and less verbose than `steps.reviewer.output.approved`. The tradeoff is that participant names share the namespace with reserved variables, which is enforced at parse time.
 
@@ -1117,12 +1121,12 @@ Available in any expression.
 
 ```
 workflow.*              definition metadata
-execution.*             execution metadata
+execution.*             execution metadata (includes execution.cwd)
 execution.context.*     shared data (scratchpad)
 input.*                 input parameters
 output                  workflow output (optional)
 env.*                   environment variables
-<step>.*                participant result (last execution)
+<step>.*                participant result (includes <step>.cwd for exec)
 loop.*                  iteration context (or renamed via 'as')
 event                   event payload (in wait blocks)
 now                     current timestamp
@@ -1425,6 +1429,7 @@ Decisions made during the design of this spec, with rationale:
 | Events | `emit` + `wait` | Bidirectional: emit publishes, wait subscribes. Events propagate internally too. |
 | `participants` block | Optional | Minimal workflows can be fully inline. Block exists for reuse. |
 | Triggers | Deferred to runtime | Trigger types and configuration are infrastructure decisions, not spec decisions. |
+| Working directory variables | `execution.cwd` + `<step>.cwd` | Observability: base cwd is exposed in execution context, effective cwd per step in step result. Allows expressions to reference the resolved working directory. |
 
 ---
 
