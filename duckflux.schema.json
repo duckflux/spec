@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://duckflux.dev/schema/v0.2/duckflux.schema.json",
+  "$id": "https://duckflux.dev/schema/v0.3/duckflux.schema.json",
   "title": "duckflux Workflow",
   "description": "Schema for duckflux — a minimal, deterministic, runtime-agnostic workflow DSL.",
   "type": "object",
@@ -84,7 +84,7 @@
 
     "inputs": {
       "type": "object",
-      "description": "Workflow input parameters. Each key is a parameter name. Value can be null (string, no schema), or a JSON Schema object for validation.",
+      "description": "Workflow input parameters. Accessed in CEL as workflow.inputs.<field>. Each key is a parameter name. Value can be null (string, no schema), or a JSON Schema object for validation.",
       "additionalProperties": {
         "oneOf": [
           { "type": "null" },
@@ -154,7 +154,7 @@
     },
 
     "participantInput": {
-      "description": "Input mapping. String for direct passthrough, object for structured mapping. Values are CEL expressions.",
+      "description": "Explicit input mapping. String for direct passthrough, object for structured mapping. Values are CEL expressions. Merged with implicit I/O chain input at runtime.",
       "oneOf": [
         { "type": "string" },
         {
@@ -192,7 +192,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["agent", "exec", "http", "human", "mcp", "workflow", "emit"],
+          "enum": ["exec", "http", "mcp", "workflow", "emit"],
           "description": "Participant type."
         },
         "as": {
@@ -213,16 +213,6 @@
         },
         "output": {
           "$ref": "#/$defs/participantOutputSchema"
-        },
-
-        "model": {
-          "type": "string",
-          "description": "[agent] Language model identifier."
-        },
-        "tools": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "[agent] Tools available to the agent."
         },
 
         "run": {
@@ -270,11 +260,6 @@
           "description": "[mcp] MCP tool name to invoke."
         },
 
-        "prompt": {
-          "type": "string",
-          "description": "[human] Prompt or instructions for the human operator."
-        },
-
         "event": {
           "type": "string",
           "description": "[emit] Event name to emit."
@@ -294,16 +279,16 @@
 
     "inlineParticipant": {
       "type": "object",
-      "required": ["as", "type"],
-      "description": "An inline participant definition in the flow. Must have 'as' for naming.",
+      "required": ["type"],
+      "description": "An inline participant definition in the flow. 'as' is optional — if omitted, the participant is anonymous and its output is only accessible via the implicit I/O chain.",
       "properties": {
         "as": {
           "type": "string",
-          "description": "Required name for inline participants. Used to reference outputs."
+          "description": "Optional name for inline participants. If provided, must be unique across all participant names. Enables output reference by name."
         },
         "type": {
           "type": "string",
-          "enum": ["agent", "exec", "http", "human", "mcp", "workflow", "emit"],
+          "enum": ["exec", "http", "mcp", "workflow", "emit"],
           "description": "Participant type."
         },
         "when": {
@@ -326,9 +311,6 @@
           "$ref": "#/$defs/participantOutputSchema"
         },
 
-        "model": { "type": "string" },
-        "tools": { "type": "array", "items": { "type": "string" } },
-
         "run": { "type": "string" },
         "cwd": { "type": "string" },
 
@@ -342,8 +324,6 @@
         "server": { "type": "string" },
         "tool": { "type": "string" },
 
-        "prompt": { "type": "string" },
-
         "event": { "type": "string" },
         "payload": { "$ref": "#/$defs/payload" },
         "ack": { "type": "boolean" }
@@ -353,7 +333,7 @@
 
     "flowSequence": {
       "type": "array",
-      "description": "Ordered list of flow steps.",
+      "description": "Ordered list of flow steps. Each step's output is implicitly chained as input to the next step.",
       "minItems": 1,
       "items": {
         "$ref": "#/$defs/flowStep"
@@ -361,7 +341,7 @@
     },
 
     "flowStep": {
-      "description": "A single step in the flow: participant reference (string), control construct, inline participant, or participant override.",
+      "description": "A single step in the flow: participant reference (string), control construct, inline participant (named or anonymous), or participant override.",
       "oneOf": [
         {
           "type": "string",
@@ -420,7 +400,7 @@
       "properties": {
         "parallel": {
           "$ref": "#/$defs/flowSequence",
-          "description": "Steps to run concurrently."
+          "description": "Steps to run concurrently. The chained output after a parallel block is an array of all branch outputs in declaration order."
         }
       }
     },
@@ -493,6 +473,15 @@
       "description": "A participant reference with flow-level overrides (timeout, onError, when, input, workflow, etc.).",
       "minProperties": 1,
       "maxProperties": 1,
+      "not": {
+        "anyOf": [
+          { "required": ["loop"] },
+          { "required": ["parallel"] },
+          { "required": ["if"] },
+          { "required": ["wait"] },
+          { "required": ["type"] }
+        ]
+      },
       "additionalProperties": {
         "type": "object",
         "properties": {
@@ -522,7 +511,7 @@
     },
 
     "workflowOutput": {
-      "description": "Workflow output. String (single CEL expression), object (structured mapping), or object with schema+map.",
+      "description": "Workflow output. Accessed in CEL as workflow.output. String (single CEL expression), object (structured mapping), or object with schema+map.",
       "oneOf": [
         {
           "type": "string",

@@ -70,18 +70,17 @@ A duckflux workflow is a YAML file with the following top-level structure:
 
 ```yaml
 flow:
-  - as: greet
-    type: exec
+  - type: exec
     run: echo "Hello, duckflux!"
 ```
 
-The simplest workflow requires only a `flow` with at least one step. Participants can be declared inline (as shown above) or in a separate `participants` block for reuse.
+The simplest workflow requires only a `flow` with at least one step. Participants can be declared inline (as shown above — named or anonymous) or in a separate `participants` block for reuse.
 
 ### 3.1 Top-level Fields
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `version` | no | Version of the workflow definition format. Default: `0.2`. Used for compatibility checks by the runtime. |
+| `version` | no | Version of the workflow definition format. Default: `0.3`. Used for compatibility checks by the runtime. |
 | `id` | no | Unique identifier for the workflow |
 | `name` | no | Human-readable workflow name |
 | `version` | no | Version identifier for the workflow definition |
@@ -97,7 +96,7 @@ The simplest workflow requires only a `flow` with at least one step. Participant
 
 Participants are the building blocks of a workflow. Each participant has a `type` that determines its behavior, and a set of configuration fields that vary by type.
 
-Participants can be defined in two ways:
+Participants can be defined in three ways:
 
 ### 4.1 In the `participants` Block (Reusable)
 
@@ -117,7 +116,7 @@ flow:
   - notify
 ```
 
-### 4.2 Inline in the Flow (Single Use)
+### 4.2 Named Inline in the Flow
 
 ```yaml
 flow:
@@ -136,35 +135,47 @@ flow:
     method: POST
 ```
 
-Inline participants require the `as` field to name the step. This name is used to reference outputs (`build.output`, `test.status`, etc.). Inline participants cannot be reused — use the `participants` block for reusable steps.
+Named inline participants use the `as` field to name the step. This name is used to reference outputs (`build.output`, `test.status`, etc.). Named inline participants cannot be reused — use the `participants` block for reusable steps. The `as` value must be unique across all participant names (both reusable and inline).
 
-### 4.3 Participant Types
+### 4.3 Anonymous Inline in the Flow
+
+```yaml
+flow:
+  - type: exec
+    run: echo "setup complete"
+
+  - as: deploy
+    type: exec
+    run: ./deploy.sh
+```
+
+Anonymous inline participants omit the `as` field. Their output is accessible only via the implicit I/O chain (see [I/O Chain](#107-implicit-io-chain)) — they cannot be referenced by name in CEL expressions. This is useful for fire-and-forget steps or steps whose output is only consumed by the immediately following step.
+
+### 4.4 Participant Types
 
 | Type | Description |
 |------|-------------|
-| `agent` | Autonomous agent that executes tasks using a language model and configured tools. |
 | `exec` | Terminal command execution. Useful for tests, linting, builds, deploys, and any shell operation. |
 | `http` | HTTP request. Useful for API integration, webhooks, and external service calls. |
-| `human` | Manual task performed by a human. Useful for approvals, manual reviews, and quality gates. |
 | `mcp` | Request to another MCP server. Useful for delegating tasks across different MCPs or organizations. |
 | `workflow` | Reference to another workflow file. Enables composition and reuse. See [Sub-workflows](#8-sub-workflows-composition). |
 | `emit` | Emits an event to the event hub. See [Events](#9-events). |
 
-### 4.4 Common Participant Fields
+### 4.5 Common Participant Fields
 
 These fields are available on all participant types:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `type` | string | — | Required. The participant type. |
-| `as` | string | — | Display name. Required for inline participants. |
+| `as` | string | — | Display name. Optional for inline participants. If omitted, the participant is anonymous. |
 | `timeout` | duration | from `defaults` | Maximum execution time before the step is treated as a failure. |
 | `onError` | string | `fail` | Error handling strategy. See [Error Handling](#6-error-handling). |
 | `retry` | object | — | Retry configuration. Only applies when `onError: retry`. |
 | `input` | string or map | — | Input mapping from workflow data to this participant. |
 | `output` | map | — | Output schema definition (JSON Schema, opt-in). |
 
-### 4.5 Type-specific Fields
+### 4.6 Type-specific Fields
 
 #### `exec`
 
@@ -196,7 +207,7 @@ These fields are available on all participant types:
 | `payload` | string or map | Event payload. CEL expression or map of CEL expressions. |
 | `ack` | boolean | If `true`, wait for delivery acknowledgment. Default: `false`. |
 
-### 4.6 Reserved Names
+### 4.7 Reserved Names
 
 Participant names share the same namespace as runtime variables. The following names are reserved and cannot be used as participant names:
 
@@ -462,18 +473,16 @@ Error handling is configurable at two levels: on the **participant** (default be
 ```yaml
 participants:
   coder:
-    type: agent
-    model: claude-sonnet-4-20250514
-    tools: [read, write]
+    type: exec
+    run: ./code.sh
     onError: retry
     retry:
       max: 3
       backoff: 2s
 
   reviewer:
-    type: agent
-    model: claude-sonnet-4-20250514
-    tools: [read]
+    type: exec
+    run: ./review.sh
     onError: fail
 ```
 
@@ -495,12 +504,13 @@ The `onError` field accepts the name of another participant, enabling fallback c
 ```yaml
 participants:
   coder:
-    type: agent
+    type: exec
+    run: ./code.sh
     onError: fixer
 
   fixer:
-    type: agent
-    tools: [read, write, bash]
+    type: exec
+    run: ./fix.sh
 
   deploy:
     type: exec
@@ -548,7 +558,8 @@ Applies to all steps that do not define their own timeout.
 ```yaml
 participants:
   coder:
-    type: agent
+    type: exec
+    run: ./code.sh
     timeout: 15m
 
   deploy:
@@ -602,7 +613,7 @@ flow:
   - as: build
     type: exec
     run: npm run build
-    cwd: input.packagePath
+    cwd: workflow.inputs.packagePath
 ```
 
 #### Precedence
@@ -625,8 +636,8 @@ participants:
     type: workflow
     path: ./review-loop.yaml
     input:
-      repo: input.repoUrl
-      branch: input.branch
+      repo: workflow.inputs.repoUrl
+      branch: workflow.inputs.branch
 
 flow:
   - coder
@@ -645,7 +656,7 @@ flow:
     type: workflow
     path: ./review-loop.yaml
     input:
-      repo: input.repoUrl
+      repo: workflow.inputs.repoUrl
   - deploy
 ```
 
@@ -673,7 +684,7 @@ participants:
     type: emit
     event: "task.progress"
     payload:
-      taskId: input.taskId
+      taskId: workflow.inputs.taskId
       status: coder.output.status
       timestamp: execution.startedAt
 ```
@@ -723,7 +734,7 @@ Or a structured object with CEL expressions as values:
 
 ```yaml
 payload:
-  taskId: input.taskId
+  taskId: workflow.inputs.taskId
   status: coder.output.status
   timestamp: execution.startedAt
 ```
@@ -795,7 +806,23 @@ Every participant, by default, receives and returns **string**. No schema requir
 
 Schema is **opt-in**. When defined, it uses JSON Schema (written in YAML) for validation and documentation.
 
-### 10.2 Workflow Inputs
+### 10.2 Variable Scoping: Workflow vs Participant
+
+The variables `input` and `output` are **participant-scoped** — within any CEL expression evaluated in the context of a participant, they refer to **that participant's own** input and output:
+
+- `input` — The resolved input data received by the current participant (read-only).
+- `output` — The output produced by the current participant (write-only, set by the runtime after execution).
+
+Workflow-level I/O is accessed via:
+
+- `workflow.inputs.*` — The workflow's input parameters, as defined in the `inputs` field.
+- `workflow.output` — The workflow's output, as defined in the `output` field.
+
+This separation allows participants to access their own arguments naturally (like function parameters) while still being able to reference the workflow's global inputs when needed.
+
+### 10.3 Workflow Inputs
+
+Workflow inputs are defined in the top-level `inputs` field and accessed in CEL as `workflow.inputs.<field>`.
 
 Without schema (everything is a string):
 
@@ -835,15 +862,16 @@ The `required: true` shortcut inside each field is syntactic sugar — the parse
 
 If `type` is not specified, the field is treated as `string`.
 
-### 10.3 Participant Inputs
+### 10.4 Participant Explicit Input Mapping
 
-Each participant can map data from the workflow to its inputs. Without schema, it is direct string passthrough:
+Each participant can explicitly map data from the workflow context to its inputs via CEL expressions. Without schema, it is direct string passthrough:
 
 ```yaml
 participants:
   coder:
-    type: agent
-    input: input.taskDescription
+    type: exec
+    run: ./code.sh
+    input: workflow.inputs.taskDescription
 ```
 
 With structured mapping:
@@ -851,18 +879,19 @@ With structured mapping:
 ```yaml
 participants:
   coder:
-    type: agent
+    type: exec
+    run: ./code.sh
     input:
-      task: input.taskDescription
+      task: workflow.inputs.taskDescription
       context: reviewer.output.feedback
-      repo: input.repoUrl
+      repo: workflow.inputs.repoUrl
 ```
 
-Values are CEL expressions — they can reference `input.*`, `env.*`, other steps, etc.
+Values are CEL expressions — they can reference `workflow.inputs.*`, `env.*`, other steps' outputs, etc.
 
-### 10.4 Workflow Output
+### 10.5 Workflow Output
 
-Optional. Defines the final result of the workflow, accessible by the caller (CLI, API, parent workflow).
+Optional. Defines the final result of the workflow, accessible by the caller (CLI, API, parent workflow) as `workflow.output`.
 
 **If `output` is not defined, the workflow output is the output of the last executed step.**
 
@@ -899,19 +928,22 @@ output:
     summary: reviewer.output.summary
 ```
 
-### 10.5 Participant Output
+### 10.6 Participant Output
 
-Each participant produces output accessible as `<step>.output`. Without schema, it is a string. The runtime attempts automatic parsing:
+Each **named** participant (reusable or named inline) produces output accessible as `<step>.output`. Without schema, it is a string. The runtime attempts automatic parsing:
 
 1. If the output is valid JSON → accessible as a map (`coder.output.field`)
 2. If not → accessible as a string (`coder.output`)
+
+Anonymous inline participants also produce output, but it is only accessible via the implicit I/O chain (see [10.7](#107-implicit-io-chain)).
 
 With explicit schema on the participant:
 
 ```yaml
 participants:
   reviewer:
-    type: agent
+    type: exec
+    run: ./review.sh
     output:
       approved:
         type: boolean
@@ -926,11 +958,54 @@ participants:
 
 When schema is defined, the runtime validates the step's output. Validation failure is treated as an error and follows the `onError` strategy.
 
-### 10.6 Precedence Summary
+### 10.7 Implicit I/O Chain
+
+The output of each step is implicitly passed as input to the **next sequential step**, forming a chain analogous to Unix pipes. The chained value is accessible to the receiving participant via its `input` variable.
+
+```yaml
+flow:
+  # Anonymous step — output chains to the next step
+  - type: exec
+    run: curl -s https://api.example.com/data
+
+  # Named step — receives chained input, addressable by name
+  - as: processor
+    type: exec
+    run: ./process.sh    # input contains the curl output
+
+  # Anonymous step — receives processor's output via chain
+  - type: http
+    url: https://api.example.com/result
+    method: POST
+    body: input
+```
+
+#### Chain + Explicit Input Merge
+
+When a participant has both a chained input (from the previous step) and an explicit `input` mapping, the runtime attempts to merge them:
+
+- **Map + map**: merged. Explicit mapping keys take precedence on conflict.
+- **String + string**: explicit mapping takes precedence.
+- **Incompatible types** (e.g., string + map): runtime error.
+
+#### Chain Behavior in Control Flow
+
+- **`if`/`then`/`else`**: The chained output after an `if` block is the output of the last step in whichever branch executed. If the condition is false and no `else` branch exists, the chain passes through unchanged.
+- **`loop`**: The chained output after a `loop` is the output of the last step of the last iteration.
+- **`parallel`**: The chained output after a `parallel` block is an **array** of outputs from all branches, in declaration order. Only named steps are included as named entries; anonymous outputs are included positionally.
+
+#### Anonymous Participants in Control Flow
+
+- **`if`/`then`/`else` and `loop`**: Anonymous participants are permitted. The chain operates linearly within each branch or iteration.
+- **`parallel`**: Anonymous participants are permitted, but their output is only included positionally in the output array. Since there is no "next step" within a parallel branch, the anonymous output is only meaningful as part of the aggregated result.
+
+### 10.8 Precedence Summary
 
 ```
-Nothing defined       → string in, string out
-Mapping only          → data passthrough, no validation
+Nothing defined       → string in, string out (chain passthrough)
+Chain only            → previous step output becomes input
+Explicit mapping only → CEL expressions resolve input
+Chain + explicit      → merge (explicit takes precedence on conflict)
 With schema           → validation via JSON Schema
 ```
 
@@ -1019,13 +1094,15 @@ Operations with `timestamp()` and `duration()`, temporal comparisons, component 
 
 Variables available in any CEL expression within the workflow. Accessed as direct identifiers — no `$` prefix, no `steps.` prefix.
 
-### 12.1 `workflow` — Definition Metadata
+### 12.1 `workflow` — Definition and I/O Metadata
 
 | Variable | Type | Description |
 |----------|------|-------------|
 | `workflow.id` | string | Identifier of the workflow definition |
 | `workflow.name` | string | Human-readable name |
 | `workflow.version` | string | Version of the definition |
+| `workflow.inputs` | map | Workflow input parameters, as defined in the `inputs` field |
+| `workflow.output` | string, map | Workflow output, as defined in the `output` field |
 
 ### 12.2 `execution` — Current Run Metadata
 
@@ -1042,25 +1119,34 @@ Variables available in any CEL expression within the workflow. Accessed as direc
 
 `execution.cwd` is the base working directory for the execution, resolved from the precedence chain: `--cwd` (CLI flag) > `defaults.cwd` > process cwd. Individual participants may override this with their own `cwd` field.
 
-### 12.3 `input` — Workflow Input Parameters
+### 12.3 `input` — Current Participant Input
 
-Defined by the workflow author, typed and accessed directly:
+The resolved input for the currently executing participant. This includes both the implicit chain value (see [I/O Chain](#107-implicit-io-chain)) and any explicit input mapping, merged per the rules in [10.7](#107-implicit-io-chain).
+
+Read-only from the participant's perspective.
 
 ```yaml
-inputs:
-  repoUrl: string
-  branch: string
-  verbose: bool
+# Accessing participant's own input
+participants:
+  coder:
+    type: exec
+    run: ./code.sh
+    input:
+      task: workflow.inputs.taskDescription
+      repo: workflow.inputs.repoUrl
 ```
 
 ```
-# usage in expressions
-input.repoUrl.contains("github.com") && input.verbose == true
+# Inside coder's execution context:
+input.task          # the resolved task description
+input.repo          # the resolved repo URL
 ```
 
-### 12.4 `output` — Workflow Output (Optional)
+**Note:** `input` is NOT `workflow.inputs`. To access workflow-level inputs, use `workflow.inputs.*`.
 
-Defines the final result of the workflow, accessible by the caller. If not defined, the output of the last executed step is used. See [Workflow Output](#104-workflow-output) for mapping details.
+### 12.4 `output` — Current Participant Output
+
+The output produced by the currently executing participant. Write-only; set by the runtime after execution completes.
 
 ### 12.5 `env` — Environment Variables
 
@@ -1073,12 +1159,12 @@ Injected by the runtime, never defined in the YAML (security). Read-only access.
 
 ### 12.6 `<step>` — Participant Result (Direct Access by Name)
 
-Each registered participant is accessible directly by its name (no `steps.` prefix). Access always returns data from the **last execution** of that step.
+Each **named** participant (reusable or named inline) is accessible directly by its name (no `steps.` prefix). Access always returns data from the **last execution** of that step.
 
 | Variable | Type | Description |
 |----------|------|-------------|
 | `<step>.status` | string | `success`, `failure`, `skipped` |
-| `<step>.output` | map | Free-form object returned by the step |
+| `<step>.output` | string or map | Free-form object returned by the step |
 | `<step>.startedAt` | timestamp | When the step started |
 | `<step>.finishedAt` | timestamp | When the step finished |
 | `<step>.duration` | duration | Execution time |
@@ -1087,6 +1173,8 @@ Each registered participant is accessible directly by its name (no `steps.` pref
 | `<step>.cwd` | string | Effective working directory used (only for `exec` participants) |
 
 This design choice — direct access by name instead of a `steps.` prefix — was made for DX reasons. `reviewer.output.approved` is more natural and less verbose than `steps.reviewer.output.approved`. The tradeoff is that participant names share the namespace with reserved variables, which is enforced at parse time.
+
+Anonymous inline participants are NOT addressable via this mechanism — their output is only accessible via the implicit I/O chain.
 
 ### 12.7 `loop` — Iteration Context
 
@@ -1121,12 +1209,14 @@ Available in any expression.
 
 ```
 workflow.*              definition metadata
+workflow.inputs.*       workflow input parameters
+workflow.output         workflow output
 execution.*             execution metadata (includes execution.cwd)
 execution.context.*     shared data (scratchpad)
-input.*                 input parameters
-output                  workflow output (optional)
+input                   current participant input (chain + explicit, merged)
+output                  current participant output (write-only)
 env.*                   environment variables
-<step>.*                participant result (includes <step>.cwd for exec)
+<step>.*                named participant result (includes <step>.cwd for exec)
 loop.*                  iteration context (or renamed via 'as')
 event                   event payload (in wait blocks)
 now                     current timestamp
@@ -1249,24 +1339,22 @@ inputs:
 
 participants:
   coder:
-    type: agent
+    type: exec
     as: "Code Builder"
-    model: claude-sonnet-4-20250514
-    tools: [read, write, bash]
+    run: ./code.sh
     timeout: 15m
     onError: retry
     retry:
       max: 2
       backoff: 5s
     input:
-      repo: input.repoUrl
-      branch: input.branch
+      repo: workflow.inputs.repoUrl
+      branch: workflow.inputs.branch
 
   reviewer:
-    type: agent
+    type: exec
     as: "Code Reviewer"
-    model: claude-sonnet-4-20250514
-    tools: [read]
+    run: ./review.sh
     timeout: 10m
     onError: fail
     output:
@@ -1286,7 +1374,7 @@ flow:
   - loop:
       as: round
       until: reviewer.output.approved == true
-      max: input.maxReviewRounds
+      max: workflow.inputs.maxReviewRounds
       steps:
         - reviewer
         - coder:
@@ -1387,7 +1475,7 @@ This gives you red squiggles on invalid fields, autocomplete on participant type
 
 ## 16. Roadmap (v2+)
 
-Features deliberately out of scope for v0.2. Deferred to future versions based on real-world demand:
+Features deliberately out of scope for v0.3. Deferred to future versions based on real-world demand:
 
 - **DAG mode** — Explicit step dependencies (`depends: [stepA, stepB]`) instead of linear sequence. Sequence + parallel covers 95% of cases today, but complex graphs with many cross-dependencies become hard to express linearly.
 
@@ -1419,12 +1507,14 @@ Decisions made during the design of this spec, with rationale:
 |----------|--------|-----------|
 | Expression language | Google CEL | Runtime-agnostic (Go, Rust, JS), sandboxed, type-checked at parse time, familiar syntax. |
 | Variable access | Direct by name (`reviewer.output`) | Better DX than `steps.reviewer.output`. Tradeoff: shared namespace with reserved words. |
+| I/O variable scoping | `input`/`output` = participant, `workflow.inputs`/`workflow.output` = workflow | Participant-scoped `input` is more natural (like function parameters). Workflow I/O is namespaced to avoid collision. |
+| Implicit I/O chain | Output of step N chains as input to step N+1 | Unix pipe analogy. Enables anonymous participants and reduces boilerplate for linear flows. |
 | Step output on re-execution | Last execution only | Simpler mental model. `reviewer.output` always means "the most recent result". |
 | Input/Output default | String | Like stdin/stdout — the universal interface. Schema is opt-in via JSON Schema. |
 | Schema format | JSON Schema in YAML | Industry standard, validators available in every language. |
 | Error handling levels | Participant (default) + flow (override) | Follows the same precedence pattern as timeout. |
 | Workflow output default | Last executed step | Convention over configuration. Explicit mapping available but not required. |
-| Inline participants | `as` required | Inline participants need a name for output reference. Single use only. |
+| Inline participants | `as` optional | Named inline participants are addressable by name. Anonymous inline (no `as`) output is only accessible via implicit I/O chain. |
 | Loop context rename | `as` field | Allows `attempt.index` instead of `loop.index` for semantic clarity. |
 | Events | `emit` + `wait` | Bidirectional: emit publishes, wait subscribes. Events propagate internally too. |
 | `participants` block | Optional | Minimal workflows can be fully inline. Block exists for reuse. |
@@ -1433,4 +1523,4 @@ Decisions made during the design of this spec, with rationale:
 
 ---
 
-*Version 0.2 — March 2026*
+*Version 0.3 — March 2026*
