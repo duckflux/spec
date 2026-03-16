@@ -1,0 +1,25 @@
+# duckflux 🦆
+Duckflux is a declarative, YAML-based DSL for orchestrating workflows. You describe **what** should happen and in what order — the runtime handles execution. No SDK required, no boilerplate, no vendor lock-in.
+
+## Links
+
+- [Website](https://duckflux.openvibes.tech)
+- [History and motivation](https://docs.duckflux.openvibes.tech/about)
+- [Documentation](https://docs.duckflux.openvibes.tech)
+  - [Getting Started](https://docs.duckflux.openvibes.tech/getting-started)
+  - [Workflow Reference](https://docs.duckflux.openvibes.tech/workflows)
+  - [Tooling](https://docs.duckflux.openvibes.tech/tooling)
+
+## Runtimes
+
+Duckflux is runtime-agnostic. Any implementation that adheres to the spec can execute workflows. Currently, we have:
+
+- [Go Runner](https://docs.duckflux.openvibes.tech/runtimes/go): a production-ready implementation written in Go, available as a CLI.
+- [JavaScript Runtime](https://docs.duckflux.openvibes.tech/runtimes/javascript): a runtime implementation written in TypeScript, designed specially for Bun. Ideal for running from command line or embedding in JavaScript applications.
+
+## Specification
+
+- [Specification document](./SPEC.md) `v0.3`
+- [JSON Schema](./duckflux.schema.json)
+- [Changelog](./CHANGELOG.md)
+- [Roadmap](./ROADMAP.md)
