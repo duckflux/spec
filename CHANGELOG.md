@@ -1,6 +1,25 @@
 # Changelog
 
-## v0.3 (Draft)
+## v0.4 (Draft)
+
+### New Features
+
+#### `set` flow construct (context assignment)
+
+- New flow-level construct `set` writes values into `execution.context` via CEL expressions.
+- Syntax: `- set: { key: <CEL expression>, ... }` — each key becomes `execution.context.<key>`.
+- `set` is a control operation, not a participant. It does not produce output and is transparent to the implicit I/O chain (pass-through).
+- Multiple keys may be assigned in a single `set` block. Existing keys are overwritten.
+- `set` keys MUST NOT use reserved names (`workflow`, `execution`, `input`, `output`, `env`, `loop`, `event`).
+- Eliminates the need for workarounds like `exec` + `cat` to assign intermediate values.
+
+### Spec Version
+
+- Specification version bumped from `0.3` to `0.4`.
+
+---
+
+## v0.3
 
 ### Breaking Changes
 
@@ -79,5 +98,6 @@ Design decisions made during the development of this spec, with rationale:
 | Loop context rename | `as` field | Allows `attempt.index` instead of `loop.index` for semantic clarity. |
 | Events | `emit` + `wait` | Bidirectional: emit publishes, wait subscribes. Events propagate internally too. |
 | `participants` block | Optional | Minimal workflows can be fully inline. Block exists for reuse. |
+| `set` construct | Flow-level, writes to `execution.context` | Not a participant — it's a control operation like `if` or `wait`. Eliminates `exec`+`cat` workarounds for intermediate value assignment. Map syntax allows multiple keys in one step. |
 | Triggers | Deferred to runtime | Trigger types and configuration are infrastructure decisions, not spec decisions. |
 | Working directory variables | `execution.cwd` + `<step>.cwd` | Observability: base cwd is exposed in execution context, effective cwd per step in step result. Allows expressions to reference the resolved working directory. |

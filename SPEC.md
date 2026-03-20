@@ -1,6 +1,6 @@
 # Duckflux Workflow Specification
 
-**Version:** 0.3
+**Version:** 0.4
 **Status:** Draft
 
 ## 1. Introduction
@@ -25,7 +25,7 @@ A Duckflux workflow is a YAML document with the following top-level fields:
 
 | Field | Required | Type | Description |
 |-------|----------|------|-------------|
-| `version` | no | string | Specification version. Default: `"0.3"`. |
+| `version` | no | string | Specification version. Default: `"0.4"`. |
 | `id` | no | string | Unique identifier for the workflow definition. |
 | `name` | no | string | Human-readable name. |
 | `defaults` | no | object | Global defaults applied to all participants. |
@@ -171,7 +171,7 @@ The `flow` field defines the execution sequence as an ordered array. Each elemen
 - A **participant reference** (string)
 - A **named inline participant** (object with `as` and `type`)
 - An **anonymous inline participant** (object with `type`, without `as`)
-- A **control flow construct** (`loop`, `parallel`, `if`, `wait`)
+- A **control flow construct** (`loop`, `parallel`, `if`, `wait`, `set`)
 - A **participant reference with overrides** (object with participant name as key)
 
 The `flow` array MUST contain at least one step.
@@ -321,6 +321,47 @@ flow:
 ```
 
 Flow-level overrides always take precedence over participant-level definitions.
+
+### 4.8 Set (Context Assignment)
+
+Writes one or more values into `execution.context`, making them available to all subsequent CEL expressions.
+
+```yaml
+flow:
+  - set:
+      token: workflow.inputs.api_token
+      region: env.AWS_REGION
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `<key>` | CEL expression | Each key becomes `execution.context.<key>`. The value is a CEL expression evaluated at runtime. |
+
+The `set` construct is a **flow-level control operation**, not a participant. It does not produce output and does not participate in the implicit I/O chain — the chain passes through unchanged.
+
+Multiple keys MAY be set in a single `set` block. Keys that already exist in `execution.context` are overwritten.
+
+A `set` key MUST NOT use a reserved name (see §3.5).
+
+**Example — conditional assignment:**
+
+```yaml
+flow:
+  - if:
+      condition: has(workflow.inputs.notion_token)
+      then:
+        - set:
+            notion_token: workflow.inputs.notion_token
+      else:
+        - set:
+            notion_token: env.NOTION_TOKEN
+
+  - as: fetch_pages
+    type: http
+    url: "'https://api.notion.com/v1/pages'"
+    headers:
+      Authorization: "'Bearer ' + execution.context.notion_token"
+```
 
 ---
 
@@ -753,7 +794,7 @@ workflow.*              Definition metadata
 workflow.inputs.*       Workflow input parameters
 workflow.output         Workflow output
 execution.*             Execution metadata
-execution.context.*     Shared data scratchpad
+execution.context.*     Shared data scratchpad (writable via `set` construct)
 input                   Current participant input (chain + explicit, merged)
 output                  Current participant output (write-only)
 env.*                   Environment variables
@@ -776,7 +817,7 @@ A conforming parser MUST validate:
 - Participant types and their required type-specific fields
 - Reserved participant name violations
 - Inline participant name uniqueness (no `as` conflicts with `participants` keys or other inline `as` values)
-- Flow construct structure (`loop`, `parallel`, `if`, `wait`)
+- Flow construct structure (`loop`, `parallel`, `if`, `wait`, `set`)
 - `loop` requires at least one of `until` or `max`
 - Duration literal format
 - Retry configuration structure
@@ -791,6 +832,7 @@ A conforming runtime SHOULD validate:
 - Sub-workflow file paths resolve
 - Absence of circular dependencies
 - I/O chain merge compatibility (§5.7)
+- `set` keys are not reserved names
 
 ---
 

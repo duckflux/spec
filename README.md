@@ -19,7 +19,7 @@ Duckflux is runtime-agnostic. Any implementation that adheres to the spec can ex
 
 ## Specification
 
-- [Specification document](./SPEC.md) `v0.3`
+- [Specification document](./SPEC.md) `v0.4`
 - [JSON Schema](./duckflux.schema.json)
 - [Changelog](./CHANGELOG.md)
 - [Roadmap](./ROADMAP.md)

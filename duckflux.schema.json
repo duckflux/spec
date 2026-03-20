@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://duckflux.dev/schema/v0.3/duckflux.schema.json",
+  "$id": "https://duckflux.dev/schema/v0.4/duckflux.schema.json",
   "title": "duckflux Workflow",
   "description": "Schema for duckflux — a minimal, deterministic, runtime-agnostic workflow DSL.",
   "type": "object",
@@ -350,6 +350,7 @@
         { "$ref": "#/$defs/loopStep" },
         { "$ref": "#/$defs/parallelStep" },
         { "$ref": "#/$defs/ifStep" },
+        { "$ref": "#/$defs/setStep" },
         { "$ref": "#/$defs/waitStep" },
         { "$ref": "#/$defs/inlineParticipant" },
         { "$ref": "#/$defs/participantOverrideStep" }
@@ -430,6 +431,22 @@
       }
     },
 
+    "setStep": {
+      "type": "object",
+      "required": ["set"],
+      "additionalProperties": false,
+      "properties": {
+        "set": {
+          "type": "object",
+          "description": "Writes values into execution.context. Each key becomes execution.context.<key>. Values are CEL expressions.",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/celExpression"
+          }
+        }
+      }
+    },
+
     "waitStep": {
       "type": "object",
       "required": ["wait"],
@@ -479,6 +496,7 @@
           { "required": ["parallel"] },
           { "required": ["if"] },
           { "required": ["wait"] },
+          { "required": ["set"] },
           { "required": ["type"] }
         ]
       },
