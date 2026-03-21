@@ -1,6 +1,6 @@
 # Duckflux Workflow Specification
 
-**Version:** 0.4
+**Version:** 0.5
 **Status:** Draft
 
 ## 1. Introduction
@@ -25,7 +25,7 @@ A Duckflux workflow is a YAML document with the following top-level fields:
 
 | Field | Required | Type | Description |
 |-------|----------|------|-------------|
-| `version` | no | string | Specification version. Default: `"0.4"`. |
+| `version` | no | string | Specification version. Default: `"0.5"`. |
 | `id` | no | string | Unique identifier for the workflow definition. |
 | `name` | no | string | Human-readable name. |
 | `defaults` | no | object | Global defaults applied to all participants. |
@@ -322,6 +322,47 @@ flow:
 
 Flow-level overrides always take precedence over participant-level definitions.
 
+#### 4.7.1 Input Merge on Flow Override
+
+When a flow override specifies `input` for a participant invocation, the runtime MUST **merge** it with the participant's declared `input` instead of replacing it. Merge rules follow the chain merge semantics (§5.7):
+
+- **map + map**: merge keys; flow override wins on conflict.
+- **string + string**: flow override wins (full replace).
+- **incompatible types**: runtime error.
+
+When all three sources are present (chain + participant base input + flow override input), the merge order is:
+
+```
+chain value < participant base input < flow override input
+```
+
+Flow override has highest precedence on key conflicts, then participant base, then chain.
+
+**Example:**
+
+```yaml
+participants:
+  fetch_page:
+    type: exec
+    input:
+      NOTION_TOKEN: execution.context.token   # base input
+    run: |
+      curl -sS "https://api.notion.com/v1/pages/$(cat)" \
+        -H "Authorization: Bearer ${NOTION_TOKEN}"
+
+flow:
+  # resolved input = { NOTION_TOKEN: execution.context.token, PAGE_ID: workflow.inputs.story_id }
+  - fetch_page:
+      input:
+        PAGE_ID: workflow.inputs.story_id
+
+  - fetch_page:
+      input:
+        PAGE_ID: open_task.output
+```
+
+This change affects only `input` field merging. All other flow-level overrides (`timeout`, `onError`, `retry`, `when`) continue to **replace** the participant-level value.
+
 ### 4.8 Set (Context Assignment)
 
 Writes one or more values into `execution.context`, making them available to all subsequent CEL expressions.
@@ -523,11 +564,14 @@ flow:
 ### 5.8 Precedence Summary
 
 ```
-Nothing defined       → string in, string out (chain passthrough)
-Chain only            → previous step output becomes input
-Explicit mapping only → CEL expressions resolve input
-Chain + explicit      → merge (explicit takes precedence on conflict)
-With schema           → validation via JSON Schema
+Nothing defined                          → string in, string out (chain passthrough)
+Chain only                               → previous step output becomes input
+Participant input only                   → CEL expressions resolve input
+Flow override input only                 → CEL expressions resolve input
+Participant input + flow override input  → merge (flow override wins on conflict)
+Chain + participant input                → merge (participant input wins on conflict)
+Chain + participant input + flow override → three-way merge (flow override > participant > chain)
+With schema                              → validation via JSON Schema
 ```
 
 ---

@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.5 (Draft)
+
+### New Features
+
+#### Participant input merge on flow override
+
+- When a flow override specifies `input` for a participant invocation, the runtime now **merges** it with the participant's declared `input` instead of replacing it.
+- Merge rules follow the existing chain merge semantics (§5.7): map + map merges keys (flow override wins on conflict), string + string uses flow override, incompatible types produce a runtime error.
+- When all three sources are present (chain + participant base input + flow override input), the merge order is: `chain < participant base input < flow override input`. Flow override has highest precedence.
+- This change affects only the `input` field. All other flow-level overrides (`timeout`, `onError`, `retry`, `when`) continue to replace the participant-level value.
+- Eliminates the need to repeat base inputs on every flow-level override call.
+
+### Spec Version
+
+- Specification version bumped from `0.4` to `0.5`.
+
+---
+
 ## v0.4 (Draft)
 
 ### New Features
