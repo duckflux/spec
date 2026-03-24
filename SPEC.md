@@ -1,6 +1,6 @@
 # Duckflux Workflow Specification
 
-**Version:** 0.5
+**Version:** 0.6
 **Status:** Draft
 
 ## 1. Introduction
@@ -25,7 +25,7 @@ A Duckflux workflow is a YAML document with the following top-level fields:
 
 | Field | Required | Type | Description |
 |-------|----------|------|-------------|
-| `version` | no | string | Specification version. Default: `"0.5"`. |
+| `version` | no | string | Specification version. Default: `"0.6"`. |
 | `id` | no | string | Unique identifier for the workflow definition. |
 | `name` | no | string | Human-readable name. |
 | `defaults` | no | object | Global defaults applied to all participants. |
@@ -129,6 +129,35 @@ All participant types accept the following fields:
 |-------|------|-------------|
 | `run` | string | **Required.** Shell command to execute. |
 | `cwd` | string | Working directory. Supports CEL expressions. |
+
+##### Input Passing Semantics
+
+How the resolved `input` value (after chain merge + explicit mapping per §5.7) is delivered to the subprocess depends on its type:
+
+**Map input → environment variables.** When the resolved input is a map (object), each key-value pair MUST be injected as an environment variable in the subprocess environment. Keys become variable names; values are coerced to strings. The `run` command MAY reference them via standard shell interpolation (e.g., `${KEY}`). These variables are set in addition to any variables inherited from the runtime environment (`env.*` bindings).
+
+```yaml
+- as: deploy
+  type: exec
+  run: ./deploy.sh --branch="${BRANCH}" --env="${TARGET_ENV}"
+  input:
+    BRANCH: workflow.inputs.branch
+    TARGET_ENV: execution.context.environment
+```
+
+**String input → stdin.** When the resolved input is a scalar string, it MUST be passed to the subprocess via standard input (stdin). This enables Unix pipe-style chaining between `exec` steps.
+
+```yaml
+flow:
+  - type: exec
+    run: curl -s https://api.example.com/data
+  - type: exec
+    run: jq '.items[] | .name'
+```
+
+In this example, the output of `curl` chains as a string to the next step, which receives it on stdin.
+
+**No input.** When no input is available (no chain value, no explicit mapping), the subprocess MUST receive no data on stdin and MUST inherit only the runtime's own environment variables (including any `env.*` bindings). No additional environment variables are injected.
 
 #### 3.4.2 `http`
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.6 (Draft)
+
+### New Features
+
+#### `exec` participant input passing semantics
+
+- Defined how the resolved `input` value is delivered to `exec` subprocesses, based on its type.
+- **Map input → environment variables:** When the resolved input is a map, each key-value pair MUST be injected as an environment variable in the subprocess. Keys become variable names, values are coerced to strings. The `run` command may reference them via shell interpolation (`${KEY}`).
+- **String input → stdin:** When the resolved input is a scalar string, it MUST be passed to the subprocess via stdin. This enables Unix pipe-style chaining between `exec` steps.
+- **No input:** When no input is available, the subprocess receives no stdin and only inherits the runtime's environment variables (`env.*` bindings).
+
+### Spec Version
+
+- Specification version bumped from `0.5` to `0.6`.
+
+---
+
 ## v0.5 (Draft)
 
 ### New Features
