@@ -14,8 +14,7 @@ Duckflux is a declarative, YAML-based DSL for orchestrating workflows. You descr
 
 Duckflux is runtime-agnostic. Any implementation that adheres to the spec can execute workflows. Currently, we have:
 
-- [Go Runner](https://docs.duckflux.openvibes.tech/runtimes/go): a production-ready implementation written in Go, available as a CLI.
-- [JavaScript Runtime](https://docs.duckflux.openvibes.tech/runtimes/javascript): a runtime implementation written in TypeScript, designed specially for Bun. Ideal for running from command line or embedding in JavaScript applications.
+- [JavaScript Runtime](https://docs.duckflux.openvibes.tech/runtimes/javascript): a runtime implementation written in TypeScript.
 
 ## Specification
 
