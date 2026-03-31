@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://duckflux.dev/schema/v0.4/duckflux.schema.json",
+  "$id": "https://duckflux.dev/schema/v0.7/duckflux.schema.json",
   "title": "duckflux Workflow",
   "description": "Schema for duckflux — a minimal, deterministic, runtime-agnostic workflow DSL.",
   "type": "object",
@@ -78,6 +78,12 @@
         "cwd": {
           "type": "string",
           "description": "Default working directory for exec participants. Supports CEL expressions."
+        },
+        "onError": {
+          "$ref": "#/$defs/onError"
+        },
+        "retry": {
+          "$ref": "#/$defs/retryConfig"
         }
       }
     },

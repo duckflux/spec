@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.7 (Draft)
+
+### New Features
+
+#### `defaults.onError` — global error handling strategy
+
+- Added `onError` and `retry` as optional fields in the `defaults` block.
+- `defaults.onError` is the lowest-priority fallback in the error strategy resolution chain: `flow override > participant > defaults > fail`.
+- Accepts the same values as participant-level `onError`: `fail`, `skip`, `retry`, or a participant name (redirect).
+- When set to `retry`, `defaults.retry` provides the global retry configuration.
+- Purely additive — existing workflows without `defaults.onError` are unaffected (implicit default remains `fail`).
+
+#### `ms` (milliseconds) duration unit
+
+- Added `ms` as a valid duration unit alongside `s`, `m`, `h`, `d`.
+- `1000ms` is equivalent to `1s`.
+- Valid in all duration-accepting fields: `timeout`, `retry.backoff`, `wait.poll`, `wait.timeout`.
+
+### Spec Version
+
+- Specification version bumped from `0.6` to `0.7`.
+
+---
+
 ## v0.6 (Draft)
 
 ### New Features

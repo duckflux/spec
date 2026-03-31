@@ -1,6 +1,6 @@
 # Duckflux Workflow Specification
 
-**Version:** 0.6
+**Version:** 0.7
 **Status:** Draft
 
 ## 1. Introduction
@@ -15,7 +15,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 - **CEL** refers to the Common Expression Language as defined in https://github.com/google/cel-spec.
 - **JSON Schema** refers to the JSON Schema specification (https://json-schema.org/).
-- Duration literals use the format `<number><unit>`, where unit is one of: `s` (seconds), `m` (minutes), `h` (hours), `d` (days).
+- Duration literals use the format `<number><unit>`, where unit is one of: `ms` (milliseconds), `s` (seconds), `m` (minutes), `h` (hours), `d` (days).
 
 ---
 
@@ -25,7 +25,7 @@ A Duckflux workflow is a YAML document with the following top-level fields:
 
 | Field | Required | Type | Description |
 |-------|----------|------|-------------|
-| `version` | no | string | Specification version. Default: `"0.6"`. |
+| `version` | no | string | Specification version. Default: `"0.7"`. |
 | `id` | no | string | Unique identifier for the workflow definition. |
 | `name` | no | string | Human-readable name. |
 | `defaults` | no | object | Global defaults applied to all participants. |
@@ -52,6 +52,8 @@ The `defaults` object MAY contain the following fields:
 |-------|------|-------------|
 | `timeout` | duration | Default timeout applied to all participants. |
 | `cwd` | string | Default working directory for `exec` participants. |
+| `onError` | string | Default error handling strategy for all participants (see §6). |
+| `retry` | object | Default retry configuration when `onError` is `retry` (see §6.3). |
 
 ---
 
@@ -623,7 +625,7 @@ When `onError` references another participant name, that participant MUST exist 
 ### 6.2 Precedence
 
 ```
-flow-level onError > participant-level onError > global default (fail)
+flow-level onError > participant-level onError > defaults.onError > global default (fail)
 ```
 
 ### 6.3 Retry Configuration
