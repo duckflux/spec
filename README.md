@@ -6,15 +6,15 @@ Duckflux is a declarative, YAML-based DSL for orchestrating workflows. You descr
 - [Website](https://duckflux.openvibes.tech)
 - [History and motivation](https://docs.duckflux.openvibes.tech/about)
 - [Documentation](https://docs.duckflux.openvibes.tech)
-  - [Getting Started](https://docs.duckflux.openvibes.tech/getting-started)
-  - [Workflow Reference](https://docs.duckflux.openvibes.tech/workflows)
-  - [Tooling](https://docs.duckflux.openvibes.tech/tooling)
+  - [Getting Started](https://docs.duckflux.openvibes.tech/getting-started/your-first-workflow/)
+  - [Workflow Reference](https://docs.duckflux.openvibes.tech/workflows/)
+  - [Tooling](https://docs.duckflux.openvibes.tech/tooling/)
 
 ## Runtimes
 
 Duckflux is runtime-agnostic. Any implementation that adheres to the spec can execute workflows. Currently, we have:
 
-- [JavaScript Runtime](https://docs.duckflux.openvibes.tech/runtimes/javascript): a runtime implementation written in TypeScript.
+- [JavaScript Runtime](https://docs.duckflux.openvibes.tech/runtime/overview): a runtime implementation written in TypeScript.
 
 ## Specification
 
@@ -22,3 +22,7 @@ Duckflux is runtime-agnostic. Any implementation that adheres to the spec can ex
 - [JSON Schema](./duckflux.schema.json)
 - [Changelog](./CHANGELOG.md)
 - [Roadmap](./ROADMAP.md)
+
+## Star history
+
+[![Star History Chart](https://api.star-history.com/svg?repos=duckflux/spec&type=date&legend=top-left)](https://www.star-history.com/#duckflux/spec&type=date&legend=top-left)
