@@ -1,0 +1,97 @@
+name: "Feature Issue (Implementation Plan)"
+description: "Create a multi-wave implementation plan that will be executed autonomously by Claude agents."
+title: "Feature: <short plan name>"
+labels: ["feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## How this works
+
+        A feature issue represents an **implementation plan** — a set of task issues organized into dependency waves. When you kickstart this issue with `/agents start` (or assign it to someone), the orchestrator will:
+
+        1. Create a `feature/<this-issue-number>` branch from `main`
+        2. Dispatch the first wave of tasks (one task worker per issue)
+        3. Track progress as tasks are merged into the feature branch
+        4. Advance through waves until everything is done
+        5. Open a final PR: `feature/<N>` → `main`
+
+        **Before creating this issue, create the individual task issues first** so you can reference them by number in the YAML plan below.
+
+  - type: textarea
+    id: purpose
+    attributes:
+      label: Purpose
+      description: What does this implementation plan accomplish? Why does it exist?
+      placeholder: |
+        Example: Implement the core authentication system with JWT tokens, refresh flow, and OAuth providers.
+    validations:
+      required: true
+
+  - type: textarea
+    id: plan
+    attributes:
+      label: Plan
+      description: |
+        Define the waves and which task issues belong to each. The orchestrator accepts **two formats** — use whichever you prefer:
+
+        **YAML (preferred — explicit and unambiguous):**
+        - A fenced code block with `yaml` language marker
+        - `waves:` is a list of objects with `name` and `tasks` (array of issue numbers)
+
+        **Markdown (fallback — natural headings):**
+        - `## Wave 1 — <name>` (or `###`, `**Wave 1:**`, `Wave 1:`)
+        - Followed by `- [ ] #N` checkbox lines
+
+        Rules (both formats):
+        - Issues within the same wave run in parallel
+        - A wave is "ready" when ALL issues from previous waves are merged
+        - Wave order = dependency order
+        - The orchestrator tries YAML first; if no valid YAML block is found, falls back to markdown
+      value: |
+        ```yaml
+        waves:
+          - name: Foundation
+            tasks: [1]
+          - name: Contracts
+            tasks: [2]
+          - name: Core
+            tasks: [3, 4, 5]
+        ```
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: progress
+    attributes:
+      label: Progress (checkboxes — updated by the orchestrator)
+      description: |
+        A flat checkbox list of all task issues. The orchestrator marks these as `[x]` when their PRs are merged. Initial state should be all unchecked.
+      value: |
+        - [ ] #1 Title `P0`
+        - [ ] #2 Title `P0`
+        - [ ] #3 Title `P0`
+        - [ ] #4 Title `P1`
+        - [ ] #5 Title `P1`
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes (optional)
+      description: Any additional context, links to design docs, or special instructions.
+      placeholder: |
+        - Related design doc: [link]
+        - Slack thread: [link]
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        **After creating this issue:** comment `/agents start` on it (or assign it) to kickstart the orchestration loop.
+
+        **Priorities:** tasks labeled `priority:P0` are auto-merged. Others may require human review depending on your branch protection rules.
