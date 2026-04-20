@@ -25,4 +25,4 @@ Duckflux is runtime-agnostic. Any implementation that adheres to the spec can ex
 
 ## Star history
 
-[![Star History Chart](https://api.star-history.com/svg?repos=duckflux/spec&type=date&legend=top-left)](https://www.star-history.com/#duckflux/spec&type=date&legend=top-left)
+[![Star History Chart](https://api.star-history.com/svg?repos=deepducks/spec&type=date&legend=top-left)](https://www.star-history.com/#deepducks/spec&type=date&legend=top-left)
